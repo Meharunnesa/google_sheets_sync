@@ -1,0 +1,16 @@
+{
+    "name": "bristy/google-sheets",
+    "type": "wordpress-plugin",
+    "autoload": {
+        "psr-4": {
+            "Bristy\\GoogleSheets\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Meharunnesa",
+            "email": "meharunnesab28@gmail.com"
+        }
+    ],
+    "require": {}
+}

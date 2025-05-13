@@ -11,10 +11,14 @@
  * Domain Path:       /languages
  */
 
+use EasyCommerce\API\Order;
+require_once __DIR__ . '/vendor/autoload.php';
+
 class Google_Sheets_Sync {
 
     public function __construct() {
         add_filter( 'easycommerce_settings_menus', array( $this, 'add_settings_menu' ) );
+        add_action('easycommerce_after_order', [ $this, 'sync_order_info' ], 10, 1 );
     }
 
     public function add_settings_menu( $easycommerce_settings_menus ) {
@@ -89,7 +93,59 @@ class Google_Sheets_Sync {
 
         return $easycommerce_settings_menus;
     }
-   
+
+    public function sync_order_info( $order_id ) {
+        
+        $enable_sync = get_option('enable_sync');
+    
+        if ($enable_sync !== 'on') {
+            return;
+        }
+    
+        $spreadsheet_id = get_option('spreadsheet_id');
+        $range_name     = get_option('range-name');
+        $private_key    = str_replace("\\n", "\n", get_option('private-key'));
+        // $private_key    = get_option('private-key');
+        $client_email   = get_option('client-email');
+    
+        // Get order details
+        $order = new Order($order_id);
+        $order_data = [
+            $order->get_id(),
+            $order->get_customer_name(),
+            $order->get_total(),
+            $order->get_status(),
+            date('Y-m-d H:i:s')
+        ];
+    
+        // Send data to Google Sheets
+        $this->send_to_google_sheets($spreadsheet_id, $range_name, $order_data, $private_key, $client_email);
+    }
+
+    private function send_to_google_sheets( $spreadsheet_id, $range_name, $values, $private_key, $client_email ) {
+        try {
+            $client = new \Google_Client();
+            $client->setApplicationName('EasyCommerce Sheets Sync');
+            $client->setScopes([\Google_Service_Sheets::SPREADSHEETS]);
+            $client->setAuthConfig([
+                'type' => 'service_account',
+                'client_email' => $client_email,
+                'private_key' => $private_key,
+            ]);
+            $service = new \Google_Service_Sheets($client);
+        
+            $body = new \Google_Service_Sheets_ValueRange([
+                'values' => [ $values ]
+            ]);
+        
+            $params = ['valueInputOption' => 'RAW'];
+            $service->spreadsheets_values->append($spreadsheet_id, $range_name, $body, $params);
+        }catch (Exception $e) {
+            error_log('Google Sheets Sync Error: ' . $e->getMessage());
+        }
+        
+    }
+  
 }
 
 new Google_Sheets_Sync();
